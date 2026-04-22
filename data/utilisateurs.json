@@ -1,0 +1,26 @@
+[
+  {
+    "identifiant": "admin",
+    "mot_de_passe": "$2y$10$83yF65bVa84GQRzOaMei.uiJkctdCWKPG2VZ2Zpyj7Pgkx/W7GV5q",
+    "role": "super_admin",
+    "nom_complet": "Super Administrateur",
+    "date_creation": "2026-04-17",
+    "actif": true
+  },
+  {
+    "identifiant": "manager",
+    "mot_de_passe": "$2y$10$WOrhgyPp0d1SJYBUf1c6/./RR6SHv4tZmqI1DWWS//9nUQOr3AZZe",
+    "role": "manager",
+    "nom_complet": "Jean Manager",
+    "date_creation": "2026-04-17",
+    "actif": true
+  },
+  {
+    "identifiant": "caissier",
+    "mot_de_passe": "$2y$10$dyeczM/ZjdQqkXesE5e9HufCvPbpFAskqH/ubU/kGArKcN6CMHCkC",
+    "role": "caissier",
+    "nom_complet": "Marie Caissière",
+    "date_creation": "2026-04-17",
+    "actif": true
+  }
+]

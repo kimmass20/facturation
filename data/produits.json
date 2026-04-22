@@ -1,0 +1,26 @@
+[
+  {
+    "code_barre": "3017620422003",
+    "nom": "Huile de palme 1L",
+    "prix_unitaire_ht": 1200,
+    "date_expiration": "12-31-2026",
+    "quantite_stock": 50,
+    "date_enregistrement": "2026-04-17"
+  },
+  {
+    "code_barre": "3256220172882",
+    "nom": "Savon de Marseille",
+    "prix_unitaire_ht": 450,
+    "date_expiration": "06-30-2027",
+    "quantite_stock": 100,
+    "date_enregistrement": "2026-04-17"
+  },
+  {
+    "code_barre": "5410063021084",
+    "nom": "Riz parfumé 2kg",
+    "prix_unitaire_ht": 2800,
+    "date_expiration": "11-15-2026",
+    "quantite_stock": 30,
+    "date_enregistrement": "2026-04-17"
+  }
+]
