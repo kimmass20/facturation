@@ -1,10 +1,13 @@
-// Gestion du scanner de codes-barres avec QuaggaJS
+// Ce fichier JavaScript pilote le scanner de codes-barres côté navigateur.
+// Il dépend de la librairie QuaggaJS chargée avant lui dans la page.
 
 let scannerActif = false;
 
-// Configuration de Quagga
+// Objet de configuration principal du scanner.
+// Il décrit la source vidéo, les formats de codes acceptés et le comportement de détection.
 const configQuagga = {
     inputStream: {
+        // LiveStream = flux vidéo temps réel depuis la caméra du terminal.
         name: "Live",
         type: "LiveStream",
         target: document.querySelector('#scanner-viewport'),
@@ -15,6 +18,7 @@ const configQuagga = {
         }
     },
     decoder: {
+        // Liste des symbologies de codes-barres que l'on autorise à la lecture.
         readers: [
             "ean_reader",
             "ean_8_reader",
@@ -38,21 +42,25 @@ const configQuagga = {
             }
         }
     },
+    // locator aide Quagga à localiser la zone probable du code-barres dans l'image.
     locator: {
         patchSize: "medium",
         halfSample: true
     },
+    // Nombre de workers en parallèle pour répartir le traitement.
     numOfWorkers: 4,
     frequency: 10,
     locate: true
 };
 
-// Démarre le scanner
+// Fonction d'ouverture/initialisation du scanner.
 function demarrerScanner() {
+    // Guard clause : évite d'initialiser deux fois le scanner.
     if (scannerActif) return;
 
     Quagga.init(configQuagga, function(err) {
         if (err) {
+            // console.error aide au debug côté développeur.
             console.error("Erreur d'initialisation du scanner:", err);
             alert("Impossible d'accéder à la caméra. Vérifiez les permissions.");
             return;
@@ -65,28 +73,28 @@ function demarrerScanner() {
         document.getElementById('btn-arreter-scanner').style.display = 'inline-block';
     });
 
-    // Écoute les détections
+    // Callback déclenché quand Quagga détecte un code-barres valide.
     Quagga.onDetected(function(result) {
         const code = result.codeResult.code;
 
-        // Affiche le résultat
+        // Mise à jour immédiate de l'interface.
         document.getElementById('code-barre-detecte').textContent = code;
         document.getElementById('scanner-resultat').style.display = 'block';
 
-        // Remplit le formulaire
+        // On hydrate le formulaire pour que le backend puisse exploiter le code détecté.
         document.getElementById('input-code-barre').value = code;
         document.getElementById('affichage-code-barre').value = code;
         document.getElementById('btn-enregistrer').disabled = false;
 
-        // Arrête le scanner
+        // On coupe le flux vidéo après détection pour éviter des scans multiples.
         arreterScanner();
 
-        // Vérifie si le produit existe déjà
+        // Redirection vers la même page avec le code dans l'URL pour lancer le lookup PHP.
         window.location.href = '?code_barre=' + encodeURIComponent(code);
     });
 }
 
-// Arrête le scanner
+    // Fonction d'arrêt propre du scanner.
 function arreterScanner() {
     if (!scannerActif) return;
 
@@ -97,11 +105,11 @@ function arreterScanner() {
     document.getElementById('btn-arreter-scanner').style.display = 'none';
 }
 
-// Écouteurs d'événements
+// Binding des événements UI sur les boutons de contrôle.
 document.getElementById('btn-demarrer-scanner').addEventListener('click', demarrerScanner);
 document.getElementById('btn-arreter-scanner').addEventListener('click', arreterScanner);
 
-// Active le bouton d'enregistrement si un code-barres est déjà présent
+// Si la page a déjà été rechargée avec un code-barres, on réactive le bouton d'enregistrement.
 if (document.getElementById('input-code-barre').value) {
     document.getElementById('btn-enregistrer').disabled = false;
 }
