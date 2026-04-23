@@ -3,12 +3,14 @@
  * Fonctions de gestion des produits
  */
 
+// Constantes partagées du projet : chemins, formats, monnaie, etc.
 require_once __DIR__ . '/../config/config.php';
 
 /**
  * Charge tous les produits depuis le fichier JSON
  */
 function charger_produits() {
+    // Même stratégie de persistance que pour les factures : stockage JSON sur disque.
     if (!file_exists(FICHIER_PRODUITS)) {
         return [];
     }
@@ -16,6 +18,7 @@ function charger_produits() {
     $contenu = file_get_contents(FICHIER_PRODUITS);
     $produits = json_decode($contenu, true);
 
+    // Fallback utile si le fichier est vide ou mal formé.
     return $produits ?: [];
 }
 
@@ -23,6 +26,7 @@ function charger_produits() {
  * Sauvegarde les produits dans le fichier JSON
  */
 function sauvegarder_produits($produits) {
+    // Encodage pretty print pour conserver un fichier lisible par un humain.
     $json = json_encode($produits, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     return file_put_contents(FICHIER_PRODUITS, $json) !== false;
 }
@@ -31,6 +35,7 @@ function sauvegarder_produits($produits) {
  * Trouve un produit par son code-barres
  */
 function trouver_produit($code_barre) {
+    // Le code-barres joue ici le rôle d'identifiant fonctionnel du produit.
     $produits = charger_produits();
 
     foreach ($produits as $produit) {
@@ -46,9 +51,10 @@ function trouver_produit($code_barre) {
  * Enregistre un nouveau produit
  */
 function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expiration, $quantite_stock) {
+    // On charge le catalogue courant pour savoir si on crée ou si on remplace.
     $produits = charger_produits();
 
-    // Vérifie si le produit existe déjà
+    // Recherche d'un éventuel produit existant avec le même code-barres.
     $index_existant = -1;
     foreach ($produits as $index => $produit) {
         if ($produit['code_barre'] === $code_barre) {
@@ -57,6 +63,7 @@ function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expirat
         }
     }
 
+    // Snapshot complet du produit à enregistrer.
     $nouveau_produit = [
         'code_barre' => $code_barre,
         'nom' => $nom,
@@ -67,10 +74,10 @@ function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expirat
     ];
 
     if ($index_existant >= 0) {
-        // Met à jour le produit existant
+        // Upsert simplifié : si le produit existe, on l'écrase avec la nouvelle version.
         $produits[$index_existant] = $nouveau_produit;
     } else {
-        // Ajoute un nouveau produit
+        // Sinon on ajoute une nouvelle entrée au catalogue.
         $produits[] = $nouveau_produit;
     }
 
@@ -81,6 +88,7 @@ function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expirat
  * Met à jour le stock d'un produit
  */
 function mettre_a_jour_stock($code_barre, $nouvelle_quantite) {
+    // Mutation ciblée de la quantité stockée pour un produit donné.
     $produits = charger_produits();
 
     foreach ($produits as &$produit) {
@@ -97,6 +105,7 @@ function mettre_a_jour_stock($code_barre, $nouvelle_quantite) {
  * Décrémente le stock d'un produit
  */
 function decrementer_stock($code_barre, $quantite_vendue) {
+    // Utilisé juste après la validation d'une facture pour refléter la sortie de stock.
     $produits = charger_produits();
 
     foreach ($produits as &$produit) {
@@ -113,6 +122,7 @@ function decrementer_stock($code_barre, $quantite_vendue) {
  * Valide les données d'un produit
  */
 function valider_produit($nom, $prix_unitaire_ht, $date_expiration, $quantite_stock) {
+    // Validation serveur des champs saisis dans le formulaire produit.
     $erreurs = [];
 
     if (empty(trim($nom))) {
@@ -127,7 +137,7 @@ function valider_produit($nom, $prix_unitaire_ht, $date_expiration, $quantite_st
         $erreurs[] = "La quantité en stock doit être un nombre positif.";
     }
 
-    // Valide le format de date MM-JJ-AAAA
+    // Validation de date au format attendu par cette application : MM-JJ-AAAA.
     $date_parts = explode('-', $date_expiration);
     if (count($date_parts) !== 3) {
         $erreurs[] = "Le format de date doit être MM-JJ-AAAA.";
@@ -145,6 +155,7 @@ function valider_produit($nom, $prix_unitaire_ht, $date_expiration, $quantite_st
  * Formate le prix avec la monnaie
  */
 function formater_prix($montant) {
+    // number_format gère l'affichage français du montant, puis on ajoute la devise.
     return number_format($montant, 2, ',', ' ') . ' ' . MONNAIE;
 }
 
@@ -152,6 +163,7 @@ function formater_prix($montant) {
  * Convertit une date MM-JJ-AAAA en AAAA-MM-JJ
  */
 function convertir_date_us_vers_iso($date_us) {
+    // Cette conversion permet d'avoir un format cohérent pour le stockage.
     $parts = explode('-', $date_us);
     if (count($parts) === 3) {
         return $parts[2] . '-' . $parts[0] . '-' . $parts[1];
@@ -163,6 +175,7 @@ function convertir_date_us_vers_iso($date_us) {
  * Convertit une date AAAA-MM-JJ en MM-JJ-AAAA
  */
 function convertir_date_iso_vers_us($date_iso) {
+    // Conversion inverse pour l'affichage ou la réédition dans les formulaires.
     $parts = explode('-', $date_iso);
     if (count($parts) === 3) {
         return $parts[1] . '-' . $parts[2] . '-' . $parts[0];
