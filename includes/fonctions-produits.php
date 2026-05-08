@@ -7,6 +7,13 @@
 require_once __DIR__ . '/../config/config.php';
 
 /**
+ * Normalise un code-barres avant stockage ou recherche
+ */
+function normaliser_code_barre($code_barre) {
+    return preg_replace('/\s+/', '', trim((string)$code_barre));
+}
+
+/**
  * Charge tous les produits depuis le fichier JSON
  */
 function charger_produits() {
@@ -36,10 +43,11 @@ function sauvegarder_produits($produits) {
  */
 function trouver_produit($code_barre) {
     // Le code-barres joue ici le rôle d'identifiant fonctionnel du produit.
+    $code_barre = normaliser_code_barre($code_barre);
     $produits = charger_produits();
 
     foreach ($produits as $produit) {
-        if ($produit['code_barre'] === $code_barre) {
+        if (normaliser_code_barre($produit['code_barre']) === $code_barre) {
             return $produit;
         }
     }
@@ -52,12 +60,13 @@ function trouver_produit($code_barre) {
  */
 function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expiration, $quantite_stock) {
     // On charge le catalogue courant pour savoir si on crée ou si on remplace.
+    $code_barre = normaliser_code_barre($code_barre);
     $produits = charger_produits();
 
     // Recherche d'un éventuel produit existant avec le même code-barres.
     $index_existant = -1;
     foreach ($produits as $index => $produit) {
-        if ($produit['code_barre'] === $code_barre) {
+        if (normaliser_code_barre($produit['code_barre']) === $code_barre) {
             $index_existant = $index;
             break;
         }
@@ -89,10 +98,11 @@ function enregistrer_produit($code_barre, $nom, $prix_unitaire_ht, $date_expirat
  */
 function mettre_a_jour_stock($code_barre, $nouvelle_quantite) {
     // Mutation ciblée de la quantité stockée pour un produit donné.
+    $code_barre = normaliser_code_barre($code_barre);
     $produits = charger_produits();
 
     foreach ($produits as &$produit) {
-        if ($produit['code_barre'] === $code_barre) {
+        if (normaliser_code_barre($produit['code_barre']) === $code_barre) {
             $produit['quantite_stock'] = (int)$nouvelle_quantite;
             return sauvegarder_produits($produits);
         }
@@ -106,10 +116,11 @@ function mettre_a_jour_stock($code_barre, $nouvelle_quantite) {
  */
 function decrementer_stock($code_barre, $quantite_vendue) {
     // Utilisé juste après la validation d'une facture pour refléter la sortie de stock.
+    $code_barre = normaliser_code_barre($code_barre);
     $produits = charger_produits();
 
     foreach ($produits as &$produit) {
-        if ($produit['code_barre'] === $code_barre) {
+        if (normaliser_code_barre($produit['code_barre']) === $code_barre) {
             $produit['quantite_stock'] -= (int)$quantite_vendue;
             return sauvegarder_produits($produits);
         }
@@ -164,6 +175,9 @@ function formater_prix($montant) {
  */
 function convertir_date_us_vers_iso($date_us) {
     // Cette conversion permet d'avoir un format cohérent pour le stockage.
+    if (!preg_match('/^\d{2}-\d{2}-\d{4}$/', $date_us)) {
+        return $date_us;
+    }
     $parts = explode('-', $date_us);
     if (count($parts) === 3) {
         return $parts[2] . '-' . $parts[0] . '-' . $parts[1];
@@ -176,6 +190,9 @@ function convertir_date_us_vers_iso($date_us) {
  */
 function convertir_date_iso_vers_us($date_iso) {
     // Conversion inverse pour l'affichage ou la réédition dans les formulaires.
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_iso)) {
+        return $date_iso;
+    }
     $parts = explode('-', $date_iso);
     if (count($parts) === 3) {
         return $parts[1] . '-' . $parts[2] . '-' . $parts[0];
