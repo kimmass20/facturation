@@ -22,9 +22,15 @@ if (!isset($_SESSION['facture_en_cours'])) {
 // Variables d'interface pour afficher un retour utilisateur.
 $erreur = '';
 $message = '';
+$code_barre_scanne = '';
 
 // Cette variable servira à préremplir l'interface après un scan de code-barres.
 $produit_trouve = null;
+
+// Message de succès transmis via redirection POST→GET.
+if (isset($_GET['ajoute'])) {
+    $message = "Article ajouté à la facture !";
+}
 
 // Cas d'usage n°1 : ajout d'un article dans le panier de facture.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajouter_article'])) {
@@ -32,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajouter_article'])) {
     requiert_csrf();
 
     // Lecture et normalisation des données du formulaire.
-    $code_barre = trim($_POST['code_barre'] ?? '');
+    $code_barre = normaliser_code_barre($_POST['code_barre'] ?? '');
     $quantite = (int)($_POST['quantite'] ?? 1);
 
     // Validation métier basique.
@@ -61,7 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajouter_article'])) {
 
             // On empile l'article dans le panier de facture stocké en session.
             $_SESSION['facture_en_cours'][] = $article;
-            $message = "Article ajouté à la facture !";
+
+            // Redirection PRG : remet la page en état "propre" (sans ?code_barre=)
+            // pour que le scanner redémarre automatiquement et soit prêt pour l'article suivant.
+            header('Location: /facturation/modules/facturation/nouvelle-facture.php?ajoute=1');
+            exit();
         }
     }
 }
@@ -117,8 +127,12 @@ if (isset($_POST['annuler_facture'])) {
 
 // Cas d'usage n°5 : retour depuis le scanner avec un code-barres dans l'URL.
 if (isset($_GET['code_barre']) && !empty($_GET['code_barre'])) {
-    $code_barre_scanne = trim($_GET['code_barre']);
+    $code_barre_scanne = normaliser_code_barre($_GET['code_barre']);
     $produit_trouve = trouver_produit($code_barre_scanne);
+
+    if (!$produit_trouve) {
+        $erreur = "Aucun produit n'est enregistré pour ce code-barres. Enregistrez-le d'abord dans le catalogue.";
+    }
 }
 
 // Inclusion du header partagé.
@@ -145,13 +159,16 @@ include __DIR__ . '/../../includes/header.php';
 <!-- Bloc dédié au scanner caméra -->
 <div class="scanner-container">
     <h3>Scanner le code-barres</h3>
+    <p class="mb-2">Scannez un produit avec la caméra du PC puis ajoutez-le à la facture.</p>
 
-    <div id="scanner-viewport"></div>
+    <video id="scanner-viewport" autoplay muted playsinline></video>
 
     <div class="scanner-controls">
         <button id="btn-demarrer-scanner" class="btn-primaire"><i class="fa-solid fa-camera"></i> Démarrer le scanner</button>
         <button id="btn-arreter-scanner" class="btn-secondaire" style="display: none;"><i class="fa-solid fa-stop"></i> Arrêter le scanner</button>
     </div>
+
+    <div id="scanner-message" class="message-info" style="display: none;"></div>
 
     <div id="scanner-resultat" class="scanner-resultat" style="display: none;">
         <p><strong>Code-barres détecté :</strong> <span id="code-barre-detecte"></span></p>
@@ -169,10 +186,10 @@ include __DIR__ . '/../../includes/header.php';
 
         <div class="champ-formulaire">
             <label>Code-barres</label>
-            <!-- Ce champ visible est en lecture seule : il sert seulement d'affichage utilisateur -->
-            <input type="text" id="affichage-code-barre" readonly
+             <input type="text" id="affichage-code-barre" inputmode="numeric" autocomplete="off"
                    value="<?= isset($code_barre_scanne) ? htmlspecialchars($code_barre_scanne) : '' ?>"
-                   placeholder="Scannez un code-barres">
+                 placeholder="Scannez ou saisissez un code-barres puis appuyez sur Entrée">
+            <small style="color: #6b7280;">La webcam remplit ce champ automatiquement après lecture du code-barres.</small>
         </div>
 
         <!-- Ce bloc ne s'affiche que si le produit a été reconnu -->
@@ -271,71 +288,8 @@ include __DIR__ . '/../../includes/header.php';
 <?php
 // On injecte ici du JavaScript spécifique à cette page via une variable du footer.
 $script_supplementaire = '
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-<script>
-// Module front-end de scan code-barres pour la page de facturation.
-let scannerActif = false;
-
-const configQuagga = {
-    // inputStream décrit la source vidéo que Quagga doit analyser.
-    inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: document.querySelector("#scanner-viewport"),
-        constraints: {
-            width: 640,
-            height: 480,
-            facingMode: "environment"
-        }
-    },
-    // decoder liste les formats de codes-barres que l\'on accepte.
-    decoder: {
-        readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader", "upc_reader", "upc_e_reader"]
-    },
-    locate: true
-};
-
-function demarrerScanner() {
-    // Guard clause : si le scanner tourne déjà, on évite une double initialisation.
-    if (scannerActif) return;
-
-    Quagga.init(configQuagga, function(err) {
-        if (err) {
-            alert("Impossible d\'accéder à la caméra.");
-            return;
-        }
-        Quagga.start();
-        scannerActif = true;
-        document.getElementById("btn-demarrer-scanner").style.display = "none";
-        document.getElementById("btn-arreter-scanner").style.display = "inline-block";
-    });
-
-    Quagga.onDetected(function(result) {
-        // Pipeline de détection : on récupère le code lu puis on l\'injecte dans l\'interface.
-        const code = result.codeResult.code;
-        document.getElementById("code-barre-detecte").textContent = code;
-        document.getElementById("scanner-resultat").style.display = "block";
-        document.getElementById("input-code-barre").value = code;
-        document.getElementById("affichage-code-barre").value = code;
-
-        // On arrête la caméra puis on recharge la page avec le code dans l\'URL.
-        arreterScanner();
-        window.location.href = "?code_barre=" + encodeURIComponent(code);
-    });
-}
-
-function arreterScanner() {
-    // On stoppe proprement le flux vidéo et on remet l\'interface dans son état initial.
-    if (!scannerActif) return;
-    Quagga.stop();
-    scannerActif = false;
-    document.getElementById("btn-demarrer-scanner").style.display = "inline-block";
-    document.getElementById("btn-arreter-scanner").style.display = "none";
-}
-
-document.getElementById("btn-demarrer-scanner").addEventListener("click", demarrerScanner);
-document.getElementById("btn-arreter-scanner").addEventListener("click", arreterScanner);
-</script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="/facturation/assets/js/scanner.js"></script>
 ';
 
 // Footer partagé + injection du script supplémentaire défini juste au-dessus.
